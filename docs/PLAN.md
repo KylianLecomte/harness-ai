@@ -43,7 +43,7 @@ the best possible code for that project.
 ## 3. Repository layout
 
 ```
-harness-ia/
+harness-ai/
 ├── README.md, LICENSE (MIT), AGENTS.md, CLAUDE.md
 ├── docs/
 │   ├── PLAN.md                    # this file
@@ -91,65 +91,40 @@ Every generated project links to that reference.
 ### Short example
 
 ```toml
+schema_version = 1
+
 [project]
-name = "budgeto"
+name = "Budgeto"
 preset = "mvp"                # prototype | poc | mvp | small | large
-language = { docs = "fr", code = "en", commits = "en" }
+types = ["web", "mobile", "backend"]
+languages = { docs = "fr", code = "en", commits = "en" }
 
-[stack]                       # user-imposed, completed by the AI (justified in ADR-0001 of the project)
-frontend = "react"            # imposed
-backend  = "java-spring"      # imposed
-database = "postgresql"       # proposed
-mobile   = "react-native"     # proposed
+[stack]                       # user-imposed, completed by the AI (justified in docs/STACK.md)
+imposed = ["frontend", "backend"]
+frontend = "react"
+backend = "java-spring"
+database = "postgresql"
+mobile = "react-native"
 
-[commands]                    # skills and CI run exactly these
+[commands]                    # skills, hooks and CI run exactly these
 test = "mise run test"
-lint = "mise run lint"
+verify = "mise run verify"
 
-[workflow]
-methodology = "spec-driven"   # none | spec-driven | tdd
-agent_commits = false
-plan_before_code = true
+[data]
+personal = "sensitive"
+categories = ["financial"]
 
-[tests]
-unit = true
-integration = true
-e2e = false
-coverage_min = 70
-
-[security]
-asvs_level = 1
-dependency_audit = true
-secrets_scan = true
-
-[performance]
-web_vitals = "measured"       # off | measured | enforced
+[performance.targets]
 api_p95_ms = 300
 
-[accessibility]
-wcag = "AA"
-
-[compliance]
-gdpr = true
-health_data = false
-
-[docs]
-adr = true
-context_glossary = true
-
-[ops]
-ci = "github-actions"
-docker = true
-devcontainer = false
-
-[agent.hooks]
-format_on_edit = true
-self_review = true            # re-read own diff against the contract before handing back
-verify_on_stop = false
-block_git_commit = true       # derived from workflow.agent_commits = false
+[tests]                       # any preset value can be overridden
+coverage_min = 90
 ```
 
-The full catalog will hold around fifty indicators (phase 1).
+Everything not written takes the preset's value. The complete definition — every key, its allowed
+values and its default in each preset — is the generated reference
+[`harness-toml.md`](harness-toml.md). `scripts/harness.py check` validates a contract and
+`scripts/harness.py resolve` prints the effective one (preset + overrides + derived values).
 
 ## 5. Quality presets and standards
 
@@ -170,7 +145,7 @@ Standards come from recognised references rather than invented rules (`catalog/s
 | Web performance | Core Web Vitals (LCP ≤ 2.5 s, INP ≤ 200 ms, CLS ≤ 0.1) | — | measured | measured | enforced in CI |
 | API performance | p95 latency target | — | indicative | target | enforced |
 | Accessibility | WCAG 2.2 | — | A | AA | AA |
-| Code | coverage / complexity / duplication | — | 60 % | 70 % | 80 % |
+| Code | coverage (+ complexity, duplication) | — | 80 % | 99 % | 99 % |
 | Personal data | GDPR (+ art. 9 / HDS for health data) | — | per data | per data | per data |
 
 `prototype` follows `poc` except where it has a UI worth caring about (light accessibility).
@@ -178,6 +153,11 @@ Domain-specific standards (e.g. ETSI EN 303 645 / Cyber Resilience Act for IoT) 
 the AI during the interview, like domain stack dimensions (§6).
 
 `docs/QUALITY.md` lists each requirement with its threshold and its verification.
+
+**Watch point — 99 % coverage.** Such a threshold pushes an agent towards trivial tests that
+cover lines without checking anything. Mitigations: coverage excludes generated code and
+configuration, and `/review` checks that tests make real assertions. Revisit after the first
+`small` project; mutation testing (`tests.mutation`) is the better signal if coverage is gamed.
 
 ## 6. Stack model → ADR-0005
 
@@ -322,7 +302,7 @@ decisions.
 | # | Phase | Verifiable outcome |
 |---|---|---|
 | 0 | Repo init, licences, this plan, harness ADRs | clean skeleton ✅ |
-| 1 | Indicator catalog, `harness.schema.json`, 5 presets, generated reference | `harness.py check` validates every preset |
+| 1 | Indicator catalog, `harness.schema.json`, 5 presets, generated reference | `harness.py check` validates every preset ✅ |
 | 2 | Doc templates, `AGENTS.md`, scaffold script | dry-run generation of one project per preset |
 | 3 | `/new-project` — first poc, then all presets | nutrition app poc framed end to end |
 | 4 | `/plan`, `/implement`, `/verify`, `/review`, `/adr` | a real feature shipped in the budget app (mvp) |

@@ -1,0 +1,681 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HarnessAI project contract (harness.toml)",
+  "description": "The single contract of a HarnessAI project. Keys marked `preset` get their default from the chosen preset (catalog/presets/); `asked` keys are settled during the interview; `derived` keys are computed or filled by the AI; `open` tables accept any key. Custom keywords: x-source, x-values (meaning of each enum value), x-effect (what the key changes in the project).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "project"],
+  "properties": {
+    "schema_version": {
+      "description": "Version of the contract format. Bumped only on breaking changes to this schema.",
+      "type": "integer",
+      "const": 1,
+      "x-source": "derived"
+    },
+
+    "project": {
+      "description": "Identity of the project.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "preset"],
+      "properties": {
+        "name": {
+          "description": "Human-readable project name.",
+          "type": "string",
+          "minLength": 1,
+          "x-source": "asked"
+        },
+        "description": {
+          "description": "One-sentence pitch: what it does and for whom.",
+          "type": "string",
+          "default": "",
+          "x-source": "asked"
+        },
+        "preset": {
+          "description": "Quality preset providing the defaults of every `preset` key.",
+          "type": "string",
+          "enum": ["prototype", "poc", "mvp", "small", "large"],
+          "x-values": {
+            "prototype": "show an idea or a UX to someone; may be thrown away",
+            "poc": "prove a technical feasibility (one risky question); thrown away",
+            "mvp": "first usable version for real users",
+            "small": "a project meant to last, limited scope",
+            "large": "production, many features, long-lived, possibly a team"
+          },
+          "x-source": "asked"
+        },
+        "types": {
+          "description": "Free tags describing the kind of project (e.g. web, mobile, backend, iot, cli, data). Guides the AI when deriving domain stack dimensions and standards.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "default": [],
+          "x-source": "asked"
+        },
+        "visibility": {
+          "description": "Whether the project is published.",
+          "type": "string",
+          "enum": ["private", "public"],
+          "default": "private",
+          "x-values": {
+            "private": "no public-facing community files",
+            "public": "open source or publicly visible"
+          },
+          "x-effect": "`public` adds LICENSE, CONTRIBUTING.md and SECURITY.md.",
+          "x-source": "asked"
+        },
+        "license": {
+          "description": "SPDX licence identifier (e.g. MIT, Apache-2.0), or `none`.",
+          "type": "string",
+          "minLength": 1,
+          "default": "none",
+          "x-source": "asked"
+        },
+        "languages": {
+          "description": "Languages used in the project. Codes such as `en`, `fr`, `pt-BR`.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "docs": { "type": "string", "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]+)?$" },
+            "code": { "type": "string", "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]+)?$" },
+            "commits": { "type": "string", "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]+)?$" }
+          },
+          "default": { "docs": "en", "code": "en", "commits": "en" },
+          "x-effect": "`docs`: framing docs and AGENTS.md prose; `code`: identifiers and comments; `commits`: proposed commit messages. The interview proposes the user's language for `docs`.",
+          "x-source": "asked"
+        }
+      }
+    },
+
+    "stack": {
+      "description": "Pillars of the technical stack, as `<dimension> = \"<choice>\"` (e.g. `frontend = \"react\"`). Dimensions are free: universal ones come from catalog/stack/, domain ones are derived by the AI. The justified detail (versions, rationale, alternatives, phase) lives in docs/STACK.md.",
+      "type": "object",
+      "properties": {
+        "imposed": {
+          "description": "Dimensions whose choice was imposed by the user (the others were proposed by the AI).",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": { "type": "string", "minLength": 1 },
+      "default": {},
+      "x-source": "open"
+    },
+
+    "commands": {
+      "description": "Shell commands of the project. Skills, hooks and CI run exactly these. Filled by the AI from the stack; extra keys allowed.",
+      "type": "object",
+      "properties": {
+        "install": { "type": "string", "description": "Install dependencies." },
+        "dev": { "type": "string", "description": "Run the project locally." },
+        "build": { "type": "string", "description": "Build for release." },
+        "format": { "type": "string", "description": "Format the code (writes)." },
+        "lint": { "type": "string", "description": "Lint the code." },
+        "typecheck": { "type": "string", "description": "Static type checking." },
+        "test": { "type": "string", "description": "Unit and integration tests." },
+        "test_e2e": { "type": "string", "description": "End-to-end tests." },
+        "audit": { "type": "string", "description": "Dependency vulnerability audit." },
+        "verify": { "type": "string", "description": "The full quality gate: everything the contract requires, in one command." }
+      },
+      "additionalProperties": { "type": "string" },
+      "default": {},
+      "x-source": "open"
+    },
+
+    "workflow": {
+      "description": "How the work is carried out with the agent.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "methodology": {
+          "description": "Development method followed by /implement.",
+          "type": "string",
+          "enum": ["none", "spec-driven", "tdd"],
+          "x-values": {
+            "none": "code directly from the task",
+            "spec-driven": "spec → plan → tasks → code; each step validated",
+            "tdd": "spec-driven, and every behaviour starts with a failing test"
+          },
+          "x-source": "preset"
+        },
+        "plan_before_code": {
+          "description": "The agent presents a plan and waits for approval before writing code.",
+          "type": "boolean",
+          "x-source": "preset"
+        },
+        "review": {
+          "description": "Review performed before a task is declared done.",
+          "type": "string",
+          "enum": ["none", "self", "agent"],
+          "x-values": {
+            "none": "no systematic review",
+            "self": "the agent re-reads its own diff against the contract",
+            "agent": "a dedicated reviewer sub-agent reviews the diff"
+          },
+          "x-source": "preset"
+        },
+        "agent_commits": {
+          "description": "The agent may run `git commit` / `git push`. When false, it proposes a commit message and the user commits.",
+          "type": "boolean",
+          "x-source": "preset"
+        }
+      }
+    },
+
+    "git": {
+      "description": "Version control conventions.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hosting": {
+          "description": "Where the repository is hosted.",
+          "type": "string",
+          "enum": ["none", "github", "gitlab", "other"],
+          "default": "none",
+          "x-effect": "Selects the CI provider and enables PR templates and issues.",
+          "x-source": "asked"
+        },
+        "branching": {
+          "description": "Branching model.",
+          "type": "string",
+          "enum": ["trunk", "feature-branches"],
+          "x-values": {
+            "trunk": "work directly on the main branch",
+            "feature-branches": "one branch per task, merged through a pull request"
+          },
+          "x-source": "preset"
+        },
+        "commit_convention": {
+          "description": "Commit message convention.",
+          "type": "string",
+          "enum": ["none", "conventional"],
+          "x-values": {
+            "none": "free-form messages",
+            "conventional": "Conventional Commits (feat:, fix:, chore:…)"
+          },
+          "x-source": "preset"
+        },
+        "issues": {
+          "description": "/plan creates issues on the hosting platform for each task.",
+          "type": "boolean",
+          "x-source": "preset"
+        }
+      }
+    },
+
+    "code": {
+      "description": "Static code quality.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "formatter": {
+          "description": "An automatic formatter is configured and applied.",
+          "type": "boolean",
+          "x-source": "preset"
+        },
+        "linter": {
+          "description": "Linter strictness.",
+          "type": "string",
+          "enum": ["off", "recommended", "strict"],
+          "x-values": {
+            "off": "no linter",
+            "recommended": "the tool's recommended rule set",
+            "strict": "recommended + stricter rules, warnings fail the gate"
+          },
+          "x-source": "preset"
+        },
+        "typecheck": {
+          "description": "Static typing strictness, when the language supports it.",
+          "type": "string",
+          "enum": ["off", "standard", "strict"],
+          "x-values": {
+            "off": "no type checking",
+            "standard": "default checker settings",
+            "strict": "strictest mode (e.g. TypeScript strict, mypy --strict)"
+          },
+          "x-source": "preset"
+        },
+        "max_complexity": {
+          "description": "Maximum cyclomatic complexity per function. 0 disables the check.",
+          "type": "integer",
+          "minimum": 0,
+          "x-source": "preset"
+        },
+        "max_duplication_pct": {
+          "description": "Maximum share of duplicated code, in percent. 0 disables the check.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "x-source": "preset"
+        }
+      }
+    },
+
+    "tests": {
+      "description": "Automated tests.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "unit": {
+          "description": "Scope of unit tests.",
+          "type": "string",
+          "enum": ["off", "critical", "business", "all"],
+          "x-values": {
+            "off": "no unit tests",
+            "critical": "critical logic only",
+            "business": "all business logic",
+            "all": "all code except generated code and configuration"
+          },
+          "x-source": "preset"
+        },
+        "integration": {
+          "description": "Scope of integration tests (database, external services, API).",
+          "type": "string",
+          "enum": ["off", "critical", "broad"],
+          "x-values": {
+            "off": "no integration tests",
+            "critical": "critical paths only",
+            "broad": "every integration point"
+          },
+          "x-source": "preset"
+        },
+        "e2e": {
+          "description": "Scope of end-to-end tests.",
+          "type": "string",
+          "enum": ["off", "critical", "broad"],
+          "x-values": {
+            "off": "no end-to-end tests",
+            "critical": "critical user journeys only",
+            "broad": "all main user journeys"
+          },
+          "x-source": "preset"
+        },
+        "coverage_min": {
+          "description": "Minimum line coverage, in percent, excluding generated code and configuration. 0 disables the check. /review also checks that tests make real assertions, so coverage is not gamed.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "x-source": "preset"
+        },
+        "mutation": {
+          "description": "Mutation testing, to measure how much the tests actually catch.",
+          "type": "boolean",
+          "x-source": "preset"
+        }
+      }
+    },
+
+    "security": {
+      "description": "Security requirements.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "description": "Security level, mapped onto the levels of the reference standards in `standards` (e.g. OWASP ASVS L1–L3).",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3,
+          "x-values": {
+            "0": "no formal requirement",
+            "1": "baseline: common vulnerabilities covered (ASVS L1)",
+            "2": "standard for apps handling sensitive data (ASVS L2)",
+            "3": "high assurance (ASVS L3)"
+          },
+          "x-source": "preset"
+        },
+        "standards": {
+          "description": "Reference security standards, chosen by the AI for the project's domain (e.g. OWASP ASVS, OWASP MASVS, ETSI EN 303 645).",
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "x-source": "derived"
+        },
+        "dependency_audit": {
+          "description": "Vulnerability audit of dependencies.",
+          "type": "string",
+          "enum": ["off", "report", "block"],
+          "x-values": {
+            "off": "no audit",
+            "report": "vulnerabilities reported, the gate still passes",
+            "block": "high or critical vulnerabilities fail the gate"
+          },
+          "x-source": "preset"
+        },
+        "secrets_scan": {
+          "description": "Scan for committed secrets.",
+          "type": "boolean",
+          "x-source": "preset"
+        },
+        "sast": {
+          "description": "Static application security testing.",
+          "type": "boolean",
+          "x-source": "preset"
+        },
+        "threat_model": {
+          "description": "A threat model is written and maintained (docs/THREAT_MODEL.md).",
+          "type": "boolean",
+          "x-source": "preset"
+        }
+      }
+    },
+
+    "data": {
+      "description": "Data handled by the project.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "personal": {
+          "description": "Whether the project handles personal data.",
+          "type": "string",
+          "enum": ["none", "standard", "sensitive"],
+          "default": "none",
+          "x-values": {
+            "none": "no personal data",
+            "standard": "ordinary personal data (e.g. email, name)",
+            "sensitive": "special categories or high-impact data (e.g. health, finances, minors)"
+          },
+          "x-source": "asked"
+        },
+        "categories": {
+          "description": "Free list of notable data categories (e.g. health, financial, minors, location).",
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "x-source": "asked"
+        },
+        "compliance": {
+          "description": "Regulatory frameworks that apply, chosen by the AI (e.g. GDPR, HDS).",
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "x-source": "derived"
+        },
+        "migrations": {
+          "description": "Schema changes go through versioned migrations.",
+          "type": "boolean",
+          "x-source": "preset"
+        },
+        "backups": {
+          "description": "Backups of persistent data are planned and restorable.",
+          "type": "boolean",
+          "x-source": "preset"
+        }
+      }
+    },
+
+    "performance": {
+      "description": "Performance requirements.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "budgets": {
+          "description": "How performance targets are treated.",
+          "type": "string",
+          "enum": ["off", "measured", "enforced"],
+          "x-values": {
+            "off": "no targets",
+            "measured": "targets defined and measured, not blocking",
+            "enforced": "targets checked in CI; a regression fails the build"
+          },
+          "x-source": "preset"
+        },
+        "targets": {
+          "description": "Domain-specific targets proposed by the AI, as `<metric> = <number>` (e.g. `lcp_ms = 2500`, `api_p95_ms = 300`, `firmware_ram_kb = 256`).",
+          "type": "object",
+          "additionalProperties": { "type": "number" },
+          "default": {},
+          "x-source": "open"
+        },
+        "load_testing": {
+          "description": "Load tests are written and run before releases.",
+          "type": "boolean",
+          "x-source": "preset"
+        }
+      }
+    },
+
+    "reliability": {
+      "description": "Behaviour under failure.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "error_handling": {
+          "description": "Error handling discipline.",
+          "type": "string",
+          "enum": ["basic", "structured", "resilient"],
+          "x-values": {
+            "basic": "errors caught at the boundaries, clear message to the user",
+            "structured": "typed errors, uniform error format for APIs",
+            "resilient": "structured + timeouts, retries, graceful degradation"
+          },
+          "x-source": "preset"
+        }
+      }
+    },
+
+    "observability": {
+      "description": "What the running project reveals about itself.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "logging": {
+          "description": "Logging style.",
+          "type": "string",
+          "enum": ["none", "basic", "structured"],
+          "x-values": {
+            "none": "no logging",
+            "basic": "plain-text logs",
+            "structured": "structured logs (JSON, levels, correlation ids)"
+          },
+          "x-source": "preset"
+        },
+        "error_tracking": {
+          "description": "Runtime errors are reported to an error tracker (Sentry-like).",
+          "type": "boolean",
+          "x-source": "preset"
+        },
+        "health_checks": {
+          "description": "Services expose health checks.",
+          "type": "boolean",
+          "x-source": "preset"
+        },
+        "metrics": {
+          "description": "Technical and business metrics are collected.",
+          "type": "boolean",
+          "x-source": "preset"
+        },
+        "tracing": {
+          "description": "Distributed tracing.",
+          "type": "boolean",
+          "x-source": "preset"
+        },
+        "product_analytics": {
+          "description": "Product usage analytics (asked during the interview; off by default in every preset).",
+          "type": "boolean",
+          "x-source": "preset"
+        }
+      }
+    },
+
+    "accessibility": {
+      "description": "Accessibility of user interfaces.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "wcag": {
+          "description": "WCAG 2.2 conformance level targeted.",
+          "type": "string",
+          "enum": ["none", "A", "AA", "AAA"],
+          "x-source": "preset"
+        },
+        "automated_checks": {
+          "description": "Automated accessibility checks run in the gate (e.g. axe).",
+          "type": "boolean",
+          "x-source": "preset"
+        }
+      }
+    },
+
+    "i18n": {
+      "description": "Internationalisation.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "locales": {
+          "description": "Locales of the user interface, the first one being the default.",
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]+)?$" },
+          "default": ["en"],
+          "x-source": "asked"
+        },
+        "ready": {
+          "description": "i18n infrastructure in place from the start, even with a single locale (no hard-coded user-facing strings).",
+          "type": "boolean",
+          "x-source": "preset"
+        }
+      }
+    },
+
+    "docs": {
+      "description": "Framing and project documentation generated and maintained.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "spec": { "description": "docs/SPEC.md — problem, users, scope, non-goals (short for poc).", "type": "boolean", "x-source": "preset" },
+        "stack": { "description": "docs/STACK.md — justified stack choices.", "type": "boolean", "x-source": "preset" },
+        "context_glossary": { "description": "docs/CONTEXT.md — domain glossary used in code and conversation.", "type": "boolean", "x-source": "preset" },
+        "architecture": { "description": "docs/ARCHITECTURE.md — modules, seams, data flow.", "type": "boolean", "x-source": "preset" },
+        "adr": { "description": "docs/adr/ — architecture decision records.", "type": "boolean", "x-source": "preset" },
+        "quality": { "description": "docs/QUALITY.md — measurable requirements and how each is verified.", "type": "boolean", "x-source": "preset" },
+        "changelog": { "description": "CHANGELOG.md maintained at each release.", "type": "boolean", "x-source": "preset" },
+        "roadmap": { "description": "docs/ROADMAP.md — produced by /plan (optional, offered during the interview).", "type": "boolean", "x-source": "preset" }
+      }
+    },
+
+    "ops": {
+      "description": "Tooling, delivery and environments.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "toolchain": {
+          "description": "How tool versions are pinned and installed.",
+          "type": "string",
+          "enum": ["mise", "none"],
+          "x-values": {
+            "mise": "mise.toml pins every tool; `mise install` sets up the machine",
+            "none": "the user manages tools manually"
+          },
+          "x-source": "preset"
+        },
+        "ci": {
+          "description": "Continuous integration runs `commands.verify` on every change. The provider follows `git.hosting`.",
+          "type": "boolean",
+          "x-source": "preset"
+        },
+        "cd": {
+          "description": "Deployment automation.",
+          "type": "string",
+          "enum": ["none", "manual", "auto"],
+          "x-values": {
+            "none": "no deployment",
+            "manual": "deployment scripted, triggered by a human",
+            "auto": "deployment triggered automatically after the gate passes"
+          },
+          "x-source": "preset"
+        },
+        "environments": {
+          "description": "Environments the project runs in.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "x-source": "preset"
+        },
+        "deploy_target": {
+          "description": "Free description of where the project is deployed (e.g. Vercel, Fly.io, VPS with Docker, app stores). Empty if not decided.",
+          "type": "string",
+          "default": "",
+          "x-source": "asked"
+        },
+        "containers": {
+          "description": "Use of containers.",
+          "type": "string",
+          "enum": ["none", "dev-services", "full"],
+          "x-values": {
+            "none": "no containers",
+            "dev-services": "local services (database, cache…) run in containers",
+            "full": "the application itself is containerised too"
+          },
+          "x-source": "preset"
+        },
+        "devcontainer": {
+          "description": "A devcontainer describes the full development environment.",
+          "type": "boolean",
+          "x-source": "preset"
+        },
+        "dependency_updates": {
+          "description": "Automated dependency update pull requests (Dependabot, Renovate…).",
+          "type": "boolean",
+          "x-source": "preset"
+        }
+      }
+    },
+
+    "agent": {
+      "description": "Behaviour and configuration of AI agents on the project.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "autonomy": {
+          "description": "How freely the agent acts; translated into each agent's permission settings.",
+          "type": "string",
+          "enum": ["supervised", "balanced", "autonomous"],
+          "x-values": {
+            "supervised": "asks before editing files or running commands",
+            "balanced": "edits and runs project commands freely, asks for anything outside the project or irreversible",
+            "autonomous": "acts freely within the project; still never commits unless allowed"
+          },
+          "x-source": "preset"
+        },
+        "adapters": {
+          "description": "Agents for which specific configuration is generated (e.g. claude, cursor, copilot). AGENTS.md is always generated.",
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "x-source": "asked"
+        },
+        "mcp_servers": {
+          "description": "MCP servers configured for the project (e.g. context7, playwright).",
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "x-source": "asked"
+        },
+        "hooks": {
+          "description": "Automatic actions run by agents that support hooks. For other agents, the same rules are written in AGENTS.md.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "format_on_edit": {
+              "description": "Run the formatter after each file edit.",
+              "type": "boolean",
+              "x-source": "preset"
+            },
+            "self_review": {
+              "description": "At the end of a turn that modified files, send the agent back once to re-read its diff against CONTEXT.md, the ADRs and QUALITY.md.",
+              "type": "boolean",
+              "x-source": "preset"
+            },
+            "verify_on_stop": {
+              "description": "At the end of a turn, run `commands.verify`; on failure, send the agent back to fix it.",
+              "type": "boolean",
+              "x-source": "preset"
+            },
+            "block_git_commit": {
+              "description": "Refuse `git commit` and `git push` from the agent. Defaults to the opposite of `workflow.agent_commits`.",
+              "type": "boolean",
+              "x-source": "derived"
+            }
+          }
+        }
+      }
+    }
+  }
+}

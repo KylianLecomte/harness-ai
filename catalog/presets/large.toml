@@ -1,0 +1,88 @@
+# HarnessAI preset: large — production, many features, long-lived, possibly a team.
+# Defaults for every `preset` key of catalog/harness.schema.json.
+# Reference: docs/harness-toml.md
+
+[workflow]
+methodology      = "spec-driven"
+plan_before_code = true
+review           = "agent"
+agent_commits    = false
+
+[git]
+branching         = "feature-branches"
+commit_convention = "conventional"
+issues            = false
+
+[code]
+formatter           = true
+linter              = "strict"
+typecheck           = "strict"
+max_complexity      = 10
+max_duplication_pct = 3
+
+[tests]
+unit         = "business"
+integration  = "broad"
+e2e          = "broad"
+coverage_min = 99
+mutation     = false
+
+[security]
+level            = 2
+dependency_audit = "block"
+secrets_scan     = true
+sast             = true
+threat_model     = true
+
+[data]
+migrations = true
+backups    = true
+
+[performance]
+budgets      = "enforced"
+load_testing = true
+
+[reliability]
+error_handling = "resilient"
+
+[observability]
+logging           = "structured"
+error_tracking    = true
+health_checks     = true
+metrics           = true
+tracing           = true
+product_analytics = false
+
+[accessibility]
+wcag             = "AA"
+automated_checks = true
+
+[i18n]
+ready = true
+
+[docs]
+spec             = true
+stack            = true
+context_glossary = true
+architecture     = true
+adr              = true
+quality          = true
+changelog        = true
+roadmap          = false
+
+[ops]
+toolchain          = "mise"
+ci                 = true
+cd                 = "auto"
+environments       = ["local", "staging", "production"]
+containers         = "full"
+devcontainer       = false
+dependency_updates = true
+
+[agent]
+autonomy = "balanced"
+
+[agent.hooks]
+format_on_edit = true
+self_review    = true
+verify_on_stop = true

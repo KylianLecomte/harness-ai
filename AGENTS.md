@@ -18,6 +18,16 @@ decisions are in [`docs/adr/`](docs/adr/) — do not re-litigate them, propose a
   presets, the generated reference and, if breaking, gets an ADR.
 - Keep `docs/PLAN.md` in sync when a decision changes, and tick roadmap phases when done.
 
+## Checks
+
+Run before handing back any change to the catalog or the scripts:
+
+```bash
+python3 scripts/harness.py doc                    # regenerate docs/harness-toml.md
+python3 scripts/harness.py check                  # schema, presets, reference up to date
+python3 -m unittest discover -s scripts/tests     # script tests
+```
+
 ## Layout
 
 | Path | Content |

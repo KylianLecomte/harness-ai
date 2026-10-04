@@ -1,0 +1,47 @@
+# A realistic contract: YNAB-like budget app, web + mobile, mvp preset.
+schema_version = 1
+
+[project]
+name = "Budgeto"
+description = "Envelope budgeting for couples, on web and mobile."
+preset = "mvp"
+types = ["web", "mobile", "backend"]
+languages = { docs = "fr", code = "en", commits = "en" }
+
+[stack]
+imposed = ["frontend", "backend"]
+frontend = "react"
+backend = "java-spring"
+database = "postgresql"
+mobile = "react-native"
+
+[commands]
+install = "mise run install"
+lint = "mise run lint"
+test = "mise run test"
+test_e2e = "mise run e2e"
+verify = "mise run verify"
+
+[git]
+hosting = "github"
+
+[data]
+personal = "sensitive"
+categories = ["financial"]
+compliance = ["GDPR"]
+
+[security]
+standards = ["OWASP ASVS", "OWASP MASVS"]
+
+[performance.targets]
+lcp_ms = 2500
+api_p95_ms = 300
+
+[i18n]
+locales = ["fr"]
+
+[ops]
+deploy_target = "Fly.io + app stores"
+
+[agent]
+adapters = ["claude"]

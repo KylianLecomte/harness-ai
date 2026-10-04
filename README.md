@@ -1,6 +1,6 @@
 # HarnessAI
 
-> **Status: work in progress** — phase 0 of the [roadmap](docs/PLAN.md#11-roadmap). Nothing is
+> **Status: work in progress** — phase 1 of the [roadmap](docs/PLAN.md#11-roadmap). Nothing is
 > installable yet.
 
 Start **any project** in agentic development — web, mobile, backend, IoT, CLI, data… — with the
@@ -26,6 +26,7 @@ Works with any agent that reads `AGENTS.md` and `SKILL.md` skills; Claude Code g
 ## Documentation
 
 - [Plan](docs/PLAN.md) — vision, design and roadmap
+- [`harness.toml` reference](docs/harness-toml.md) — every key, its values and its default per preset
 - [Architecture decisions](docs/adr/)
 
 ## Licence

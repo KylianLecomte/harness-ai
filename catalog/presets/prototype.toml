@@ -1,0 +1,88 @@
+# HarnessAI preset: prototype — show an idea or a UX to someone; may be thrown away.
+# Defaults for every `preset` key of catalog/harness.schema.json.
+# Reference: docs/harness-toml.md
+
+[workflow]
+methodology      = "none"
+plan_before_code = false
+review           = "none"
+agent_commits    = false
+
+[git]
+branching         = "trunk"
+commit_convention = "none"
+issues            = false
+
+[code]
+formatter           = true
+linter              = "recommended"
+typecheck           = "standard"
+max_complexity      = 0
+max_duplication_pct = 0
+
+[tests]
+unit         = "off"
+integration  = "off"
+e2e          = "off"
+coverage_min = 0
+mutation     = false
+
+[security]
+level            = 0
+dependency_audit = "off"
+secrets_scan     = false
+sast             = false
+threat_model     = false
+
+[data]
+migrations = false
+backups    = false
+
+[performance]
+budgets      = "off"
+load_testing = false
+
+[reliability]
+error_handling = "basic"
+
+[observability]
+logging           = "basic"
+error_tracking    = false
+health_checks     = false
+metrics           = false
+tracing           = false
+product_analytics = false
+
+[accessibility]
+wcag             = "none"
+automated_checks = false
+
+[i18n]
+ready = false
+
+[docs]
+spec             = true
+stack            = true
+context_glossary = false
+architecture     = false
+adr              = false
+quality          = false
+changelog        = false
+roadmap          = false
+
+[ops]
+toolchain          = "mise"
+ci                 = false
+cd                 = "none"
+environments       = ["local"]
+containers         = "none"
+devcontainer       = false
+dependency_updates = false
+
+[agent]
+autonomy = "balanced"
+
+[agent.hooks]
+format_on_edit = false
+self_review    = false
+verify_on_stop = false
