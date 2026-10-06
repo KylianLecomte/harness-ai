@@ -1,6 +1,6 @@
 # HarnessAI
 
-> **Status: work in progress** — phase 1 of the [roadmap](docs/PLAN.md#11-roadmap). Nothing is
+> **Status: work in progress** — phase 2 of the [roadmap](docs/PLAN.md#11-roadmap). Nothing is
 > installable yet.
 
 Start **any project** in agentic development — web, mobile, backend, IoT, CLI, data… — with the

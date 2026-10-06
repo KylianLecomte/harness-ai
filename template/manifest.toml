@@ -1,0 +1,83 @@
+# HarnessAI template manifest — the list of files generated into a project.
+#
+# Each [[file]] entry:
+#   src   path under template/ (required)
+#   dest  path in the generated project; default: src without `.tmpl`, with `dot_` → `.`
+#   when  condition on the effective contract (see "Template syntax" in AGENTS.md); default: always
+#
+# `.tmpl` files are rendered ({{ var }}, {% if %} blocks); other files are copied as-is.
+# Every file under template/ must be listed here, except LICENSE and this manifest.
+# Rendered docs keep `FILL:` markers that the AI replaces from the interview.
+
+# --- Always ---------------------------------------------------------------------------
+
+[[file]]
+src = "AGENTS.md.tmpl"
+
+[[file]]
+src = "README.md.tmpl"
+
+[[file]]
+src = "dot_gitignore"
+
+[[file]]
+src = "dot_editorconfig"
+
+# --- Framing docs -----------------------------------------------------------------------
+
+[[file]]
+src = "docs/SPEC.md.tmpl"
+when = "docs.spec"
+
+[[file]]
+src = "docs/STACK.md.tmpl"
+when = "docs.stack"
+
+[[file]]
+src = "docs/CONTEXT.md.tmpl"
+when = "docs.context_glossary"
+
+[[file]]
+src = "docs/ARCHITECTURE.md.tmpl"
+when = "docs.architecture"
+
+[[file]]
+src = "docs/QUALITY.md.tmpl"
+when = "docs.quality"
+
+[[file]]
+src = "docs/THREAT_MODEL.md.tmpl"
+when = "security.threat_model"
+
+[[file]]
+src = "docs/adr/0000-template.md"
+when = "docs.adr"
+
+[[file]]
+src = "docs/adr/0001-stack.md.tmpl"
+when = "docs.adr"
+
+[[file]]
+src = "CHANGELOG.md.tmpl"
+when = "docs.changelog"
+
+# --- Public projects --------------------------------------------------------------------
+
+[[file]]
+src = "LICENSE.tmpl"
+when = "project.visibility == \"public\" and project.license != \"none\""
+
+[[file]]
+src = "CONTRIBUTING.md.tmpl"
+when = "project.visibility == \"public\""
+
+[[file]]
+src = "SECURITY.md.tmpl"
+when = "project.visibility == \"public\""
+
+# --- Agent adapters ---------------------------------------------------------------------
+
+[[file]]
+src = "adapters/claude/CLAUDE.md.tmpl"
+dest = "CLAUDE.md"
+when = "\"claude\" in agent.adapters"

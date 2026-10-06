@@ -2,9 +2,12 @@
 """HarnessAI command-line tool (Python >= 3.11, standard library only — see ADR-0003).
 
 Usage:
-  harness.py check [CONTRACT ...]   validate the catalog (no argument) or project contracts
-  harness.py resolve CONTRACT       print the effective contract (preset + overrides + derived) as JSON
-  harness.py doc [--check]          generate docs/harness-toml.md; --check fails if it is outdated
+  harness.py check [CONTRACT ...]           validate the catalog (no argument) or project contracts
+  harness.py resolve CONTRACT               print the effective contract (preset + overrides + derived) as JSON
+  harness.py doc [--check]                  generate docs/harness-toml.md; --check fails if it is outdated
+  harness.py new CONTRACT --dest DIR [--dry-run]
+                                            generate a project from a validated contract
+  harness.py fills DIR                      list the FILL markers left in a generated project
 """
 from __future__ import annotations
 
@@ -15,6 +18,8 @@ if sys.version_info < (3, 11):
 
 import argparse
 import copy
+import datetime
+import hashlib
 import json
 import re
 import tomllib
@@ -26,8 +31,12 @@ ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_PATH = ROOT / "catalog" / "harness.schema.json"
 PRESETS_DIR = ROOT / "catalog" / "presets"
 REFERENCE_PATH = ROOT / "docs" / "harness-toml.md"
+TEMPLATE_DIR = ROOT / "template"
+MANIFEST_PATH = TEMPLATE_DIR / "manifest.toml"
+VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 
 PRESETS = ("prototype", "poc", "mvp", "small", "large")
+THROWAWAY_PRESETS = ("prototype", "poc")
 SOURCES = ("preset", "asked", "derived", "open")
 MISSING = object()
 
@@ -228,6 +237,309 @@ def apply_rules(effective: dict) -> list[tuple[Rule, str]]:
     return [(rule, rule.text) for rule in RULES if rule.broken(effective)]
 
 
+# --------------------------------------------------------------------------- template conditions
+# Grammar:  expr := and ("or" and)* ; and := not ("and" not)* ; not := "not" not | cmp
+#           cmp  := operand (("=="|"!="|">="|"<="|">"|"<"|"in") operand)? ; operand := literal | path | "(" expr ")"
+# A path is a dotted key of the render context; a missing path evaluates to None.
+
+class TemplateError(Exception):
+    pass
+
+
+TOKEN = re.compile(r'\s*(?:(?P<num>-?\d+(?:\.\d+)?)|(?P<str>"[^"]*"|\'[^\']*\')|(?P<op>==|!=|>=|<=|>|<|\(|\))'
+                   r'|(?P<name>[A-Za-z_][\w.]*))')
+COMPARATORS = {
+    "==": lambda a, b: a == b,
+    "!=": lambda a, b: a != b,
+    ">=": lambda a, b: a >= b,
+    "<=": lambda a, b: a <= b,
+    ">": lambda a, b: a > b,
+    "<": lambda a, b: a < b,
+    "in": lambda a, b: a in b,
+}
+LITERALS = {"true": True, "false": False}
+
+
+class Condition:
+    """A parsed template condition, evaluated against a render context."""
+
+    def __init__(self, text: str):
+        self.text = text
+        self.tokens = self._tokenize(text)
+        self.pos = 0
+        self.tree = self._expr()
+        if self.pos != len(self.tokens):
+            raise TemplateError(f"unexpected {self.tokens[self.pos][1]!r} in condition {text!r}")
+
+    def evaluate(self, context: dict) -> bool:
+        return bool(self._eval(self.tree, context))
+
+    # -- parsing
+    def _tokenize(self, text: str) -> list[tuple[str, Any]]:
+        tokens, pos = [], 0
+        while pos < len(text.rstrip()):
+            m = TOKEN.match(text, pos)
+            if not m or m.end() == pos:
+                raise TemplateError(f"cannot parse condition {text!r} at {text[pos:]!r}")
+            kind = m.lastgroup
+            value = m.group(kind)
+            if kind == "num":
+                value = float(value) if "." in value else int(value)
+            elif kind == "str":
+                value = value[1:-1]
+            elif kind == "name" and value in ("and", "or", "not", "in"):
+                kind = "op"
+            tokens.append((kind, value))
+            pos = m.end()
+        return tokens
+
+    def _peek(self) -> Any:
+        return self.tokens[self.pos][1] if self.pos < len(self.tokens) else None
+
+    def _take(self) -> tuple[str, Any]:
+        if self.pos >= len(self.tokens):
+            raise TemplateError(f"incomplete condition {self.text!r}")
+        self.pos += 1
+        return self.tokens[self.pos - 1]
+
+    def _expr(self) -> tuple:
+        node = self._and()
+        while self._peek() == "or":
+            self._take()
+            node = ("or", node, self._and())
+        return node
+
+    def _and(self) -> tuple:
+        node = self._not()
+        while self._peek() == "and":
+            self._take()
+            node = ("and", node, self._not())
+        return node
+
+    def _not(self) -> tuple:
+        if self._peek() == "not":
+            self._take()
+            return ("not", self._not())
+        return self._cmp()
+
+    def _cmp(self) -> tuple:
+        left = self._operand()
+        if self._peek() in COMPARATORS:
+            op = self._take()[1]
+            return ("cmp", op, left, self._operand())
+        return left
+
+    def _operand(self) -> tuple:
+        kind, value = self._take()
+        if value == "(" and kind == "op":
+            node = self._expr()
+            if self._take()[1] != ")":
+                raise TemplateError(f"missing ')' in condition {self.text!r}")
+            return node
+        if kind in ("num", "str"):
+            return ("lit", value)
+        if kind == "name":
+            return ("lit", LITERALS[value]) if value in LITERALS else ("path", value)
+        raise TemplateError(f"unexpected {value!r} in condition {self.text!r}")
+
+    # -- evaluation
+    def _eval(self, node: tuple, ctx: dict) -> Any:
+        kind = node[0]
+        if kind == "lit":
+            return node[1]
+        if kind == "path":
+            return get(ctx, node[1], None)
+        if kind == "not":
+            return not self._eval(node[1], ctx)
+        if kind == "and":
+            return self._eval(node[1], ctx) and self._eval(node[2], ctx)
+        if kind == "or":
+            return self._eval(node[1], ctx) or self._eval(node[2], ctx)
+        op, left, right = node[1], self._eval(node[2], ctx), self._eval(node[3], ctx)
+        try:
+            return COMPARATORS[op](left, right)
+        except TypeError:
+            raise TemplateError(f"cannot apply {op!r} to {left!r} and {right!r} in {self.text!r}") from None
+
+
+# --------------------------------------------------------------------------- template rendering
+# `{{ path }}` is replaced by a context value (missing path → error). Block tags
+# `{% if cond %}`, `{% elif cond %}`, `{% else %}`, `{% endif %}` stand alone on their line,
+# which is removed from the output. No loops: lists are rendered comma-separated.
+
+BLOCK = re.compile(r"^\s*\{%\s*(if|elif|else|endif)\b(.*?)%\}\s*$")
+VARIABLE = re.compile(r"\{\{\s*([A-Za-z_][\w.]*)\s*\}\}")
+
+
+def render_value(value: Any, name: str) -> str:
+    if value is MISSING or value is None or isinstance(value, dict):
+        raise TemplateError(f"{{{{ {name} }}}}: not a renderable value of the context")
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, list):
+        return ", ".join(render_value(v, name) for v in value)
+    return str(value)
+
+
+def render(text: str, context: dict, name: str = "<template>") -> str:
+    out: list[str] = []
+    stack: list[dict] = []  # open if-blocks: {parent, taken, else}
+    active = True
+    for number, line in enumerate(text.splitlines(keepends=True), 1):
+        where = f"{name}:{number}"
+        block = BLOCK.match(line)
+        if block:
+            tag, expr = block.group(1), block.group(2).strip()
+            if tag in ("if", "elif"):
+                if not expr:
+                    raise TemplateError(f"{where}: {{% {tag} %}} needs a condition")
+                condition = Condition(expr)  # parsed even in inactive branches, to catch errors
+            if tag == "if":
+                taken = active and condition.evaluate(context)
+                stack.append({"parent": active, "taken": taken, "else": False})
+                active = taken
+                continue
+            if not stack:
+                raise TemplateError(f"{where}: {{% {tag} %}} without {{% if %}}")
+            frame = stack[-1]
+            if tag in ("elif", "else") and frame["else"]:
+                raise TemplateError(f"{where}: {{% {tag} %}} after {{% else %}}")
+            if tag == "elif":
+                active = frame["parent"] and not frame["taken"] and condition.evaluate(context)
+                frame["taken"] |= active
+            elif tag == "else":
+                active = frame["parent"] and not frame["taken"]
+                frame["taken"], frame["else"] = True, True
+            else:
+                active = stack.pop()["parent"]
+            continue
+        if "{%" in line:
+            raise TemplateError(f"{where}: block tags must stand alone on their line")
+        if active:
+            try:
+                out.append(VARIABLE.sub(lambda m: render_value(get(context, m.group(1)), m.group(1)), line))
+            except TemplateError as e:
+                raise TemplateError(f"{where}: {e}") from None
+    if stack:
+        raise TemplateError(f"{name}: {len(stack)} unclosed {{% if %}} block(s)")
+    return "".join(out)
+
+
+def render_context(effective: dict, today: datetime.date | None = None) -> dict:
+    """The effective contract plus `harness.*` values available to templates."""
+    context = copy.deepcopy(effective)
+    context["harness"] = {
+        "version": VERSION,
+        "date": (today or datetime.date.today()).isoformat(),
+        "throwaway": get(effective, "project.preset") in THROWAWAY_PRESETS,
+    }
+    return context
+
+
+# --------------------------------------------------------------------------- manifest and generation
+
+FILL = re.compile(r"(?:<!--|#|//)\s*FILL:\s*(.*?)\s*(?:-->|$)")
+MANIFEST_KEYS = {"src", "dest", "when"}
+NOT_IN_MANIFEST = {"LICENSE", "manifest.toml"}
+
+
+@dataclass(frozen=True)
+class ManifestEntry:
+    src: str
+    dest: str
+    when: Condition | None
+
+
+def default_dest(src: str) -> str:
+    parts = [("." + p[4:]) if p.startswith("dot_") else p for p in src.split("/")]
+    dest = "/".join(parts)
+    return dest[:-5] if dest.endswith(".tmpl") else dest
+
+
+def load_manifest() -> list[ManifestEntry]:
+    raw = load_toml(MANIFEST_PATH).get("file", [])
+    entries = []
+    for i, item in enumerate(raw):
+        unknown = set(item) - MANIFEST_KEYS
+        if unknown or "src" not in item:
+            raise TemplateError(f"manifest entry {i + 1}: needs `src`, allows only {sorted(MANIFEST_KEYS)}")
+        when = Condition(item["when"]) if item.get("when") else None
+        entries.append(ManifestEntry(item["src"], item.get("dest") or default_dest(item["src"]), when))
+    return entries
+
+
+@dataclass
+class GeneratedFile:
+    dest: str
+    src: str
+    content: bytes
+
+
+def generate(effective: dict, today: datetime.date | None = None) -> list[GeneratedFile]:
+    """Render every manifest entry whose condition holds. Nothing is written."""
+    context = render_context(effective, today)
+    files = []
+    for entry in load_manifest():
+        if entry.when and not entry.when.evaluate(context):
+            continue
+        source = TEMPLATE_DIR / entry.src
+        if entry.src.endswith(".tmpl"):
+            content = render(source.read_text(encoding="utf-8"), context, entry.src).encode("utf-8")
+        else:
+            content = source.read_bytes()
+        files.append(GeneratedFile(entry.dest, entry.src, content))
+    return files
+
+
+def lock_data(effective: dict, files: list[GeneratedFile], today: datetime.date | None = None) -> dict:
+    """`.harness/lock.json`: what was generated, from which contract and template version."""
+    return {
+        "harness_version": VERSION,
+        "generated_on": (today or datetime.date.today()).isoformat(),
+        "contract": effective,
+        "files": {f.dest: {"src": f.src, "sha256": hashlib.sha256(f.content).hexdigest()} for f in files},
+    }
+
+
+def write_project(contract_path: Path, dest: Path, schema: dict) -> list[str]:
+    """Generate the project into `dest` (must be absent or empty). Returns the written paths."""
+    if dest.exists() and any(dest.iterdir()):
+        raise TemplateError(f"{dest} is not empty")
+    effective = resolve(load_toml(contract_path), schema)
+    files = generate(effective)
+    extra = {
+        "harness.toml": contract_path.read_bytes(),
+        ".harness/reference.md": REFERENCE_PATH.read_bytes(),
+    }
+    lock = lock_data(effective, files)
+    extra[".harness/lock.json"] = (json.dumps(lock, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+    written = []
+    for path, content in [(f.dest, f.content) for f in files] + list(extra.items()):
+        target = dest / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
+        written.append(path)
+    return written
+
+
+def find_fills(root: Path) -> list[tuple[str, int, str]]:
+    """(file, line, instruction) of every FILL marker under `root`, skipping .git and .harness."""
+    found = []
+    for path in sorted(p for p in root.rglob("*") if p.is_file()):
+        rel = path.relative_to(root)
+        if rel.parts[0] in (".git", ".harness"):
+            continue
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except (UnicodeDecodeError, OSError):
+            continue
+        for number, line in enumerate(lines, 1):
+            m = FILL.search(line)
+            if m:
+                found.append((str(rel), number, m.group(1)))
+    return found
+
+
 # --------------------------------------------------------------------------- checks
 
 @dataclass
@@ -253,6 +565,45 @@ def check_contract(path: Path, schema: dict) -> Report:
     for rule, text in apply_rules(effective):
         (report.errors if rule.severity == ERROR else report.warnings).append(f"[{rule.id}] {text}")
     return report
+
+
+def sample_contract(preset: str, public: bool = False) -> dict:
+    """A contract as the interview would leave it: asked and open keys filled."""
+    contract = {"schema_version": 1, "project": {"name": "Sample", "preset": preset},
+                "git": {"hosting": "github"}, "commands": {"verify": "make verify"},
+                "performance": {"targets": {"example_ms": 1}}}
+    if public:
+        contract["project"].update(visibility="public", license="MIT", description="A sample.")
+        contract["commands"].update({k: f"make {k}" for k in ("install", "dev", "format", "lint",
+                                                              "typecheck", "test", "test_e2e")})
+        contract["agent"] = {"adapters": ["claude"]}
+        contract["data"] = {"personal": "sensitive", "compliance": ["GDPR"]}
+    return contract
+
+
+def check_templates(schema: dict) -> list[str]:
+    """Manifest consistency, and every template rendered for every preset."""
+    try:
+        entries = load_manifest()
+    except (TemplateError, OSError, tomllib.TOMLDecodeError) as e:
+        return [f"manifest: {e}"]
+    errors = [f"manifest: {e.src} does not exist" for e in entries if not (TEMPLATE_DIR / e.src).is_file()]
+    listed = {e.src for e in entries}
+    for path in sorted(TEMPLATE_DIR.rglob("*")):
+        rel = path.relative_to(TEMPLATE_DIR).as_posix()
+        if path.is_file() and path.name != ".gitkeep" and rel not in NOT_IN_MANIFEST and rel not in listed:
+            errors.append(f"manifest: template/{rel} is not listed")
+    dests = [e.dest for e in entries]
+    errors += [f"manifest: several entries generate {d}" for d in sorted({d for d in dests if dests.count(d) > 1})]
+    if errors:
+        return errors
+    for name in PRESETS:
+        for public in (False, True):
+            try:
+                generate(resolve(sample_contract(name, public), schema))
+            except TemplateError as e:
+                errors.append(f"template ({name}, {'public' if public else 'private'}): {e}")
+    return errors
 
 
 def check_catalog(schema: dict) -> Report:
@@ -285,12 +636,10 @@ def check_catalog(schema: dict) -> Report:
             elif path not in preset_keys and present:
                 report.errors.append(f"preset {name}: {dotted(path)} is {sub['x-source']}, not a preset key")
         # Presets must be consistent once the interview has filled asked and open keys.
-        contract = {"schema_version": 1, "project": {"name": "check", "preset": name},
-                    "git": {"hosting": "github"}, "commands": {"verify": "true"},
-                    "performance": {"targets": {"example_ms": 1}}}
-        for rule, text in apply_rules(resolve(contract, schema)):
+        for rule, text in apply_rules(resolve(sample_contract(name), schema)):
             if rule.severity == ERROR:
                 report.errors.append(f"preset {name}: [{rule.id}] {text}")
+    report.errors += check_templates(schema)
     if not REFERENCE_PATH.exists() or REFERENCE_PATH.read_text(encoding="utf-8") != render_reference(schema):
         report.errors.append(f"{REFERENCE_PATH.relative_to(ROOT)} is outdated: run `scripts/harness.py doc`")
     return report
@@ -404,6 +753,12 @@ def main(argv: list[str] | None = None) -> int:
     p_resolve.add_argument("contract", type=Path)
     p_doc = sub.add_parser("doc", help="generate the harness.toml reference")
     p_doc.add_argument("--check", action="store_true", help="fail if the reference is outdated")
+    p_new = sub.add_parser("new", help="generate a project from a validated contract")
+    p_new.add_argument("contract", type=Path)
+    p_new.add_argument("--dest", type=Path, required=True, help="project directory (absent or empty)")
+    p_new.add_argument("--dry-run", action="store_true", help="list the files without writing them")
+    p_fills = sub.add_parser("fills", help="list the FILL markers left in a generated project")
+    p_fills.add_argument("dir", type=Path)
     args = parser.parse_args(argv)
     schema = load_schema()
 
@@ -426,6 +781,34 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         print(json.dumps(resolve(load_toml(args.contract), schema), indent=2, ensure_ascii=False))
         return 0
+
+    if args.command == "new":
+        report = check_contract(args.contract, schema)
+        print_report(str(args.contract), report)
+        if report.errors:
+            return 1
+        try:
+            if args.dry_run:
+                files = [f.dest for f in generate(resolve(load_toml(args.contract), schema))]
+                paths = files + ["harness.toml", ".harness/reference.md", ".harness/lock.json"]
+            else:
+                paths = write_project(args.contract, args.dest, schema)
+        except TemplateError as e:
+            print(f"✗ {e}")
+            return 1
+        print(("would write" if args.dry_run else "wrote") + f" {len(paths)} files in {args.dest}:")
+        for path in paths:
+            print(f"    {path}")
+        if not args.dry_run:
+            print(f"{len(find_fills(args.dest))} FILL markers to replace — `harness.py fills {args.dest}`")
+        return 0
+
+    if args.command == "fills":
+        fills = find_fills(args.dir)
+        for file, line, instruction in fills:
+            print(f"{file}:{line}: {instruction}")
+        print(f"{len(fills)} FILL marker(s) left")
+        return 1 if fills else 0
 
     rendered = render_reference(schema)
     if args.check:

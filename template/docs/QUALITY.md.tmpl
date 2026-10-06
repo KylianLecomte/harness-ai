@@ -1,0 +1,111 @@
+# {{ project.name }} — Quality requirements
+
+> Every requirement has a threshold **and** the way it is checked: a requirement without
+> verification does not exist. Thresholds come from `harness.toml`; change them there.
+
+## Quality gate
+
+{% if commands.verify %}
+`{{ commands.verify }}` runs the whole gate. It must pass before any task is done.
+{% else %}
+<!-- FILL: the single command that runs the whole gate (harness.toml commands.verify). -->
+{% endif %}
+{% if ops.ci %}
+CI runs the same command on every change.
+{% endif %}
+
+<!-- FILL: what the gate runs, in order (format check, lint, type check, tests, audits…). -->
+
+## Requirements
+
+| Domain | Requirement | Threshold | Verified by |
+|---|---|---|---|
+{% if code.formatter %}
+| Code | Formatting | no diff after formatting | <!-- FILL: tool --> |
+{% endif %}
+{% if code.linter != "off" %}
+| Code | Lint | `{{ code.linter }}` rule set, no error | <!-- FILL: tool --> |
+{% endif %}
+{% if code.typecheck != "off" %}
+| Code | Type checking | `{{ code.typecheck }}` | <!-- FILL: tool --> |
+{% endif %}
+{% if code.max_complexity > 0 %}
+| Code | Cyclomatic complexity per function | ≤ {{ code.max_complexity }} | <!-- FILL: tool --> |
+{% endif %}
+{% if code.max_duplication_pct > 0 %}
+| Code | Duplicated code | ≤ {{ code.max_duplication_pct }} % | <!-- FILL: tool --> |
+{% endif %}
+{% if tests.unit != "off" %}
+| Tests | Unit tests | scope `{{ tests.unit }}` | <!-- FILL: tool --> + review |
+{% endif %}
+{% if tests.integration != "off" %}
+| Tests | Integration tests | scope `{{ tests.integration }}` | <!-- FILL: tool --> + review |
+{% endif %}
+{% if tests.e2e != "off" %}
+| Tests | End-to-end tests | scope `{{ tests.e2e }}` | <!-- FILL: tool --> + review |
+{% endif %}
+{% if tests.coverage_min > 0 %}
+| Tests | Line coverage (see *Exclusions*) | ≥ {{ tests.coverage_min }} % | <!-- FILL: tool --> |
+{% endif %}
+{% if tests.mutation %}
+| Tests | Mutation score | <!-- FILL: threshold --> | <!-- FILL: tool --> |
+{% endif %}
+{% if security.level > 0 and security.standards %}
+| Security | Level {{ security.level }} of {{ security.standards }} | <!-- FILL: the matching level of each standard (e.g. ASVS L1) --> | review checklist |
+{% elif security.level > 0 %}
+| Security | Security level {{ security.level }} | <!-- FILL: the standards chosen for the domain and their matching level --> | review checklist |
+{% endif %}
+{% if security.dependency_audit != "off" %}
+| Security | Vulnerable dependencies | `{{ security.dependency_audit }}` on high/critical | <!-- FILL: tool --> |
+{% endif %}
+{% if security.secrets_scan %}
+| Security | No committed secrets | 0 finding | <!-- FILL: tool --> |
+{% endif %}
+{% if security.sast %}
+| Security | Static security analysis | 0 high finding | <!-- FILL: tool --> |
+{% endif %}
+{% if security.threat_model %}
+| Security | Threat model up to date | reviewed at each structural change | `docs/THREAT_MODEL.md` + review |
+{% endif %}
+{% if performance.budgets != "off" %}
+| Performance | Targets of harness.toml [performance.targets] | `{{ performance.budgets }}` | <!-- FILL: tool and where it runs --> |
+{% endif %}
+{% if performance.load_testing %}
+| Performance | Load test before release | <!-- FILL: load profile --> | <!-- FILL: tool --> |
+{% endif %}
+{% if accessibility.wcag != "none" %}
+| Accessibility | WCAG 2.2 | level {{ accessibility.wcag }} | review checklist |
+{% endif %}
+{% if accessibility.automated_checks %}
+| Accessibility | Automated checks | 0 violation | <!-- FILL: tool --> |
+{% endif %}
+| Reliability | Error handling | `{{ reliability.error_handling }}` (see AGENTS.md) | review |
+{% if observability.error_tracking %}
+| Observability | Runtime errors reported | every unhandled error | <!-- FILL: tool --> |
+{% endif %}
+{% if observability.health_checks %}
+| Observability | Health checks | every service | <!-- FILL: endpoint or probe --> |
+{% endif %}
+{% if data.migrations %}
+| Data | Versioned migrations | every schema change | <!-- FILL: tool --> |
+{% endif %}
+{% if data.backups %}
+| Data | Restorable backups | <!-- FILL: frequency and retention --> | <!-- FILL: restore test --> |
+{% endif %}
+{% if data.compliance %}
+| Data | Compliance: {{ data.compliance }} | <!-- FILL: key obligations --> | review checklist |
+{% endif %}
+
+## Exclusions
+
+{% if tests.coverage_min > 0 %}
+Coverage excludes generated code and configuration. Tests must make real assertions: a test that
+only executes code to raise coverage is rejected in review.
+{% endif %}
+
+<!-- FILL: any other exclusion, with its reason. -->
+
+## Accepted deviations
+
+| Date | Requirement | Deviation | Reason | Until |
+|---|---|---|---|---|

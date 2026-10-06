@@ -1,0 +1,140 @@
+# {{ project.name }} — agent instructions
+
+<!-- FILL: one paragraph — what the project is, for whom, and the problem it solves (from docs/SPEC.md). -->
+
+Quality preset: **{{ project.preset }}**. The project contract is [`harness.toml`](harness.toml): it is
+the source of truth for every rule below (reference: [`.harness/reference.md`](.harness/reference.md)).
+Never change it silently — propose the change, or run `/upgrade-quality`.
+
+## Read first
+
+1. [`docs/SPEC.md`](docs/SPEC.md) — what we build, and what we don't
+{% if docs.context_glossary %}
+1. [`docs/CONTEXT.md`](docs/CONTEXT.md) — domain vocabulary, to use in code, UI and conversation
+{% endif %}
+{% if docs.architecture %}
+1. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — modules, seams and their rules
+{% endif %}
+1. [`docs/STACK.md`](docs/STACK.md) — technical choices and why
+{% if docs.quality %}
+1. [`docs/QUALITY.md`](docs/QUALITY.md) — measurable requirements and how they are checked
+{% endif %}
+{% if docs.adr %}
+1. [`docs/adr/`](docs/adr/) — decisions already taken
+{% endif %}
+
+## Commands
+
+| Purpose | Command |
+|---|---|
+{% if commands.install %}
+| Install dependencies | `{{ commands.install }}` |
+{% endif %}
+{% if commands.dev %}
+| Run locally | `{{ commands.dev }}` |
+{% endif %}
+{% if commands.format %}
+| Format | `{{ commands.format }}` |
+{% endif %}
+{% if commands.lint %}
+| Lint | `{{ commands.lint }}` |
+{% endif %}
+{% if commands.typecheck %}
+| Type check | `{{ commands.typecheck }}` |
+{% endif %}
+{% if commands.test %}
+| Tests | `{{ commands.test }}` |
+{% endif %}
+{% if commands.test_e2e %}
+| End-to-end tests | `{{ commands.test_e2e }}` |
+{% endif %}
+{% if commands.verify %}
+| **Quality gate** | `{{ commands.verify }}` |
+{% else %}
+<!-- FILL: one row per command of harness.toml [commands]; the quality gate row last. -->
+{% endif %}
+
+## How we work
+
+{% if workflow.methodology == "tdd" %}
+- **Test-driven:** spec → plan → tasks; then for each behaviour, a failing test first, the minimal code, a refactor.
+{% elif workflow.methodology == "spec-driven" %}
+- **Spec-driven:** spec → plan → tasks → code. Each step is validated by the user before the next.
+{% else %}
+- Work directly from the task, in small steps.
+{% endif %}
+{% if workflow.plan_before_code %}
+- Present a plan and wait for approval before writing code.
+{% endif %}
+{% if workflow.review == "agent" %}
+- Before declaring a task done, have a reviewer sub-agent review the diff against this file and the docs above.
+{% elif workflow.review == "self" %}
+- Before declaring a task done, re-read your own diff against this file and the docs above.
+{% endif %}
+{% if workflow.agent_commits %}
+- You may commit your changes.
+{% else %}
+- **Never run `git commit` or `git push`.** When a change is ready, propose a commit message; the user commits.
+{% endif %}
+{% if git.branching == "feature-branches" %}
+- One branch per task, merged through a pull request.
+{% else %}
+- Work on the main branch in small increments that keep it working.
+{% endif %}
+{% if git.commit_convention == "conventional" %}
+- Commit messages follow Conventional Commits (`feat:`, `fix:`, `chore:`…).
+{% endif %}
+- Languages — docs: `{{ project.languages.docs }}`, code and comments: `{{ project.languages.code }}`, commits: `{{ project.languages.commits }}`.
+- Library and tool versions are checked (registry, release page), never written from memory.
+
+## Code rules
+
+{% if docs.context_glossary %}
+- Name things with the terms of `docs/CONTEXT.md`. A new concept gets a term there first.
+{% endif %}
+- Prefer **deep modules**: a small interface hiding a lot of behaviour. If deleting a module would
+  only move its code to its callers, it should not exist. The interface is the test surface.
+{% if docs.adr %}
+- Decisions in `docs/adr/` are settled. To revisit one, propose a new ADR — do not drift from it silently.
+{% endif %}
+{% if reliability.error_handling == "resilient" %}
+- Errors are typed and handled at the boundaries; external calls have timeouts, retries and a degraded mode.
+{% elif reliability.error_handling == "structured" %}
+- Errors are typed and handled at the boundaries, with a uniform error format.
+{% else %}
+- Errors are caught at the boundaries and shown to the user with a clear message.
+{% endif %}
+- No secrets in the code or the repository; configuration comes from the environment.
+
+## Project rules
+
+<!-- FILL: hard rules settled during the interview (e.g. "amounts are stored as integer cents"). Delete this section if there are none. -->
+
+## Definition of done
+
+{% if commands.verify %}
+- [ ] `{{ commands.verify }}` passes
+{% endif %}
+{% if tests.unit != "off" %}
+- [ ] Unit tests cover the change (scope: `{{ tests.unit }}`)
+{% endif %}
+{% if tests.integration != "off" %}
+- [ ] Integration tests cover affected integration points (scope: `{{ tests.integration }}`)
+{% endif %}
+{% if tests.e2e != "off" %}
+- [ ] End-to-end tests cover affected user journeys (scope: `{{ tests.e2e }}`)
+{% endif %}
+{% if docs.context_glossary %}
+- [ ] New or changed domain terms are in `docs/CONTEXT.md`
+{% endif %}
+{% if docs.adr %}
+- [ ] Any structural decision is recorded as an ADR
+{% endif %}
+{% if workflow.review != "none" %}
+- [ ] The diff has been reviewed against this file
+{% endif %}
+- [ ] Docs affected by the change are updated
+{% if agent.hooks.format_on_edit or agent.hooks.self_review or agent.hooks.verify_on_stop or agent.hooks.block_git_commit %}
+
+Some of these rules are enforced by hooks for agents that support them. They apply to every agent.
+{% endif %}

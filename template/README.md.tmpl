@@ -1,0 +1,54 @@
+# {{ project.name }}
+
+{% if project.description %}
+{{ project.description }}
+{% else %}
+<!-- FILL: one-sentence pitch — what it does and for whom. -->
+{% endif %}
+
+> Status: `{{ project.preset }}` — framed and built with HarnessAI.
+> Project contract: [`harness.toml`](harness.toml).
+
+## Getting started
+
+{% if ops.toolchain == "mise" %}
+```bash
+mise install    # installs the toolchain pinned in mise.toml
+```
+
+{% endif %}
+<!-- FILL: install and run commands, taken from harness.toml [commands]. -->
+
+## Documentation
+
+- [Agent instructions](AGENTS.md)
+- [Specification](docs/SPEC.md)
+- [Stack](docs/STACK.md)
+{% if docs.context_glossary %}
+- [Domain glossary](docs/CONTEXT.md)
+{% endif %}
+{% if docs.architecture %}
+- [Architecture](docs/ARCHITECTURE.md)
+{% endif %}
+{% if docs.quality %}
+- [Quality requirements](docs/QUALITY.md)
+{% endif %}
+{% if docs.adr %}
+- [Decisions](docs/adr/)
+{% endif %}
+{% if project.visibility == "public" %}
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Security issues: [SECURITY.md](SECURITY.md).
+{% endif %}
+{% if project.license != "none" %}
+
+## Licence
+
+{% if project.visibility == "public" %}
+{{ project.license }} — see [LICENSE](LICENSE).
+{% else %}
+{{ project.license }}.
+{% endif %}
+{% endif %}

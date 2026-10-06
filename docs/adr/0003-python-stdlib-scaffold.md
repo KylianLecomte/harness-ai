@@ -19,5 +19,6 @@ following the template manifest: the script adds reproducibility, it is not a ha
 ## Consequences
 
 - Python ≥ 3.11 is present by default on most Linux/WSL setups and recent macOS dev setups.
-- No third-party TOML writer: when the script must write TOML, it uses a small dedicated writer.
+- No TOML writer in the standard library: machine-only files (`.harness/lock.json`) are JSON;
+  `harness.toml` is written by the AI and copied verbatim by the script.
 - The manifest format must be readable by both the script and the AI.

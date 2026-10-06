@@ -63,7 +63,7 @@ ready = false
 [docs]
 spec             = true
 stack            = true
-context_glossary = false
+context_glossary = true
 architecture     = false
 adr              = false
 quality          = false

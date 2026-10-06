@@ -1,0 +1,24 @@
+# {{ project.name }} — Domain glossary
+
+> The shared language of the project. Use these terms — exactly — in code, UI, docs and
+> conversation. Add a term as soon as a new concept appears; sharpen a definition as soon as it
+> gets fuzzy. Do not use synonyms: if two words mean the same thing, pick one and list the other
+> under *Avoid*.
+
+## Domain
+
+<!-- FILL: the domain in 2–3 sentences, in the words of its users. -->
+
+## Terms
+
+| Term | Definition | In code | Avoid |
+|---|---|---|---|
+{% if harness.throwaway %}
+<!-- FILL: light glossary — only the concepts named in the pitch (typically 3–8). "In code": the identifier used in the code. "Avoid": synonyms not to use. -->
+{% else %}
+<!-- FILL: every domain concept settled during the interview. "In code": the identifier used in the code. "Avoid": synonyms or ambiguous words not to use. -->
+
+## Invariants
+
+<!-- FILL: business rules that are always true (e.g. "an Envelope belongs to exactly one Budget"; "amounts are integer cents"). Each one should be enforced in code and tested. -->
+{% endif %}

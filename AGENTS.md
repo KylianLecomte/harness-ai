@@ -24,9 +24,27 @@ Run before handing back any change to the catalog or the scripts:
 
 ```bash
 python3 scripts/harness.py doc                    # regenerate docs/harness-toml.md
-python3 scripts/harness.py check                  # schema, presets, reference up to date
+python3 scripts/harness.py check                  # schema, presets, manifest, templates, reference
 python3 -m unittest discover -s scripts/tests     # script tests
 ```
+
+## Template syntax
+
+Files under `template/` are listed in `template/manifest.toml` (`src`, optional `dest` and `when`).
+`.tmpl` files are rendered against the effective contract plus `harness.version`, `harness.date`
+and `harness.throwaway` (true for prototype and poc):
+
+- `{{ tests.coverage_min }}` — a value; a missing key is an error; lists render comma-separated.
+- `{% if cond %}` / `{% elif cond %}` / `{% else %}` / `{% endif %}` — **alone on their line**
+  (the line is removed). No loops.
+- Conditions: dotted keys (missing → false), `"strings"`, numbers, `true`/`false`,
+  `== != >= <= > <`, `in`, `not`, `and`, `or`, parentheses. Enums are strings: write
+  `tests.e2e != "off"`, not `tests.e2e`.
+- `<!-- FILL: instruction -->` (or `# FILL:` / `// FILL:` outside Markdown) marks content the AI
+  writes from the interview; `harness.py fills <dir>` lists what is left.
+
+`harness.py check` renders every template for every preset, so syntax errors and unknown keys are
+caught before they reach a user.
 
 ## Layout
 

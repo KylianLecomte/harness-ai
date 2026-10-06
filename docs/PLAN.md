@@ -67,9 +67,13 @@ harness-ai/
 └── examples/                      # reference generated projects = regression tests
 ```
 
-Template conventions (to be detailed in phase 2): files the tooling would otherwise pick up are
-stored under inert names (`dot_claude/` → `.claude/`, `AGENTS.md.tmpl` → `AGENTS.md`), so that
-working on the harness never loads a template as live configuration.
+Template conventions: files the tooling would otherwise pick up are stored under inert names
+(`dot_claude/` → `.claude/`, `AGENTS.md.tmpl` → `AGENTS.md`), so that working on the harness never
+loads a template as live configuration. Every generated file is listed in `template/manifest.toml`
+with its condition on the contract; `.tmpl` files use a minimal Jinja-like syntax
+(`{{ key }}`, `{% if %}` blocks, no loops) and keep `FILL:` markers for the AI. Templates are
+written in English; the AI translates them into `project.languages.docs` while filling them.
+The syntax is documented in `AGENTS.md`.
 
 ## 4. The project contract: `harness.toml`
 
@@ -187,7 +191,7 @@ configuration, and `/review` checks that tests make real assertions. Revisit aft
 | 2 | Users and key journeys | ◐ | — | ● | ● | ● |
 | 3 | Scope: MoSCoW, non-goals (poc: hypothesis + success criterion) | ◐ | ● | ● | ● | ● |
 | 4 | Platforms and project type | ● | ● | ● | ● | ● |
-| 5 | Domain and glossary | — | — | ◐ | ● | ● |
+| 5 | Domain and glossary (prototype/poc: extracted from the pitch, no question) | — | — | ◐ | ● | ● |
 | 6 | Stack (§6) | ◐ | ◐ | ● | ● | ● |
 | 7 | Architecture | — | ◐ | ◐ | ● | ● |
 | 8 | Data and compliance | — | — | ● | ● | ● |
@@ -242,9 +246,21 @@ outputs: [docs/QUALITY.md#security, harness.toml#security]
 
 ### Framing outputs
 
-`AGENTS.md` (+ `CLAUDE.md` importing it), `docs/SPEC.md`, `docs/CONTEXT.md` (domain glossary),
-`docs/ARCHITECTURE.md`, `docs/STACK.md`, `docs/QUALITY.md`, `docs/adr/0001-stack.md`, and optional
-`docs/ROADMAP.md` — each only when the preset calls for it.
+| File | Condition | prototype / poc | mvp | small | large |
+|---|---|---|---|---|---|
+| `AGENTS.md`, `README.md`, `harness.toml`, `.gitignore`, `.editorconfig` | always | ✓ | ✓ | ✓ | ✓ |
+| `CLAUDE.md` (`@AGENTS.md`) | `"claude" in agent.adapters` | ✓ | ✓ | ✓ | ✓ |
+| `docs/SPEC.md` | `docs.spec` | short | ✓ | ✓ | ✓ |
+| `docs/STACK.md` | `docs.stack` | short | ✓ | ✓ | ✓ |
+| `docs/CONTEXT.md` | `docs.context_glossary` | light | ✓ | ✓ | ✓ |
+| `docs/ARCHITECTURE.md`, `docs/QUALITY.md`, `docs/adr/` | `docs.*` | | ✓ | ✓ | ✓ |
+| `CHANGELOG.md` | `docs.changelog` | | | ✓ | ✓ |
+| `docs/THREAT_MODEL.md` | `security.threat_model` | | | | ✓ |
+| `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md` | `project.visibility = "public"` | if public | if public | if public | if public |
+
+Plus `.harness/lock.json` and `.harness/reference.md` (the `harness.toml` reference of the
+template version used). The *light* glossary of prototype and poc only lists the concepts of the
+pitch: it adds no interview question. `docs/ROADMAP.md` is produced by `/plan`.
 
 ## 8. Skills
 
@@ -271,7 +287,8 @@ decisions.
 
 ## 9. Upgrading and syncing
 
-- `.harness/lock.toml` stores the contract as last applied, plus the template version used.
+- `.harness/lock.json` stores the effective contract as last applied, the template version used and
+  the hash of every generated file (JSON: machine-only, written without dependencies).
 - `/upgrade-quality` with no argument diffs `harness.toml` against the lock: manual edits are
   detected automatically and the delta is applied (CI, hooks, missing docs, skills to enable).
 - `/upgrade-quality <preset>` first merges the new preset while keeping manual overrides.
@@ -303,7 +320,7 @@ decisions.
 |---|---|---|
 | 0 | Repo init, licences, this plan, harness ADRs | clean skeleton ✅ |
 | 1 | Indicator catalog, `harness.schema.json`, 5 presets, generated reference | `harness.py check` validates every preset ✅ |
-| 2 | Doc templates, `AGENTS.md`, scaffold script | dry-run generation of one project per preset |
+| 2 | Doc templates, `AGENTS.md`, scaffold script | dry-run generation of one project per preset ✅ |
 | 3 | `/new-project` — first poc, then all presets | nutrition app poc framed end to end |
 | 4 | `/plan`, `/implement`, `/verify`, `/review`, `/adr` | a real feature shipped in the budget app (mvp) |
 | 5 | `/upgrade-quality` + lock | nutrition app upgraded poc → mvp without breakage |

@@ -290,7 +290,7 @@ Framing and project documentation generated and maintained.
 |---|---|---|---|---|---|---|---|
 | `spec` | boolean | preset | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `stack` | boolean | preset | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `context_glossary` | boolean | preset | ✗ | ✗ | ✓ | ✓ | ✓ |
+| `context_glossary` | boolean | preset | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `architecture` | boolean | preset | ✗ | ✗ | ✓ | ✓ | ✓ |
 | `adr` | boolean | preset | ✗ | ✗ | ✓ | ✓ | ✓ |
 | `quality` | boolean | preset | ✗ | ✗ | ✓ | ✓ | ✓ |

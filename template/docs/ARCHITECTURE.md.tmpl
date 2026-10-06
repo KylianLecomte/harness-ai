@@ -1,0 +1,57 @@
+# {{ project.name }} — Architecture
+
+> How the code is organised and why. Module names come from `docs/CONTEXT.md`.
+> Principles: deep modules (small interface, lot of behaviour), seams where behaviour must vary,
+> the interface is the test surface.
+
+## Overview
+
+<!-- FILL: the architectural style (e.g. modular monolith, hexagonal, client + API) and why it fits, then a Mermaid diagram of the main parts and their dependencies. -->
+
+## Modules
+
+<!-- FILL: one `###` per module — responsibility, interface (what callers must know), depends on. Keep the list short: a module that would only move code to its callers should not exist. -->
+
+## Seams and adapters
+
+<!-- FILL: where behaviour can be swapped without editing in place (database, external services, clock, payment…), with the adapters behind each seam (real, fake for tests). -->
+
+## Data
+
+<!-- FILL: main entities and their relationships (Mermaid erDiagram if useful), where data lives, how it flows through the key journeys of docs/SPEC.md. -->
+{% if data.migrations %}
+
+Schema changes go through versioned migrations.
+{% endif %}
+
+## Errors
+
+{% if reliability.error_handling == "resilient" %}
+<!-- FILL: typed errors and where they are handled; timeouts, retries and degraded modes for each external dependency; the error format returned to clients. -->
+{% elif reliability.error_handling == "structured" %}
+<!-- FILL: typed errors and where they are handled (boundaries); the uniform error format returned to clients. -->
+{% else %}
+<!-- FILL: where errors are caught and how they are shown to the user. -->
+{% endif %}
+{% if observability.logging != "none" or observability.error_tracking or observability.metrics or observability.tracing %}
+
+## Observability
+
+<!-- FILL: what is logged and how; error tracking, metrics, tracing and health checks as required by harness.toml [observability]. -->
+{% endif %}
+{% if security.level > 0 %}
+
+## Security
+
+<!-- FILL: authentication, authorisation model, protection of sensitive data (at rest, in transit), trust boundaries. Target: security level {{ security.level }} of the standards in harness.toml [security]. -->
+{% endif %}
+{% if ops.environments %}
+
+## Deployment
+
+<!-- FILL: environments ({{ ops.environments }}), the deployment target, and how a change reaches production. -->
+{% endif %}
+
+## Rules
+
+<!-- FILL: architectural rules the code must respect (dependency directions, what a module may not import, where side effects live). Each rule should be checkable in review or by a tool. -->

@@ -1,0 +1,36 @@
+# {{ project.name }} — Stack
+
+> Every technical choice, why it was made and what was rejected.
+> Versions checked on <!-- FILL: date of the online version check (YYYY-MM-DD) -->.
+
+## Overview
+
+<!-- FILL: the stack in one paragraph — the main pieces and how they fit together. -->
+
+## Choices
+
+| Dimension | Choice | Version | Origin | Phase |
+|---|---|---|---|---|
+<!-- FILL: one row per dimension — the pillars of harness.toml [stack] plus every dimension settled during the interview (universal and domain-specific). Origin: `imposed` (by the user) or `proposed` (by the AI). Phase: `now`, or `deferred` with its trigger. -->
+
+## Rationale
+
+<!-- FILL: one `###` subsection per non-obvious choice: why it fits this project, and the alternatives rejected with the reason. Imposed choices that fit poorly are flagged here. -->
+{% if not harness.throwaway %}
+
+## Principles
+
+<!-- FILL: principles that guide future technical choices (e.g. "no hosting-specific feature: switching host only changes environment variables"). -->
+
+## Deferred
+
+<!-- FILL: what is deliberately left for later (e.g. a cache, a queue), and the signal that will bring it in. Delete if nothing is deferred. -->
+{% endif %}
+
+## Toolchain and local setup
+
+{% if ops.toolchain == "mise" %}
+Tool versions are pinned in `mise.toml`; `mise install` sets up a machine.
+
+{% endif %}
+<!-- FILL: prerequisites and the steps from a fresh clone to a running project. -->

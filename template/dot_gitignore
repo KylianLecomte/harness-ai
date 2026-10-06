@@ -1,0 +1,16 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Logs
+*.log
+
+# FILL: entries for the stack (dependencies, build output, caches, coverage reports…).

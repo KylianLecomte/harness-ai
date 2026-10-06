@@ -1,0 +1,28 @@
+# Contributing to {{ project.name }}
+
+Thanks for your interest! This project is built with AI agents and humans alike; the same rules
+apply to both, and they are written in [AGENTS.md](AGENTS.md).
+
+## Getting started
+
+<!-- FILL: from a fresh clone to a running project (same steps as README.md). -->
+
+## Making a change
+
+{% if git.branching == "feature-branches" %}
+1. Create a branch for your change.
+{% endif %}
+1. Follow the rules and the definition of done of [AGENTS.md](AGENTS.md).
+{% if commands.verify %}
+1. Run `{{ commands.verify }}` — it must pass.
+{% endif %}
+{% if git.commit_convention == "conventional" %}
+1. Write commit messages following [Conventional Commits](https://www.conventionalcommits.org/).
+{% endif %}
+{% if git.hosting != "none" %}
+1. Open a pull request describing what and why.
+{% endif %}
+
+## Reporting a vulnerability
+
+Please do not open a public issue: see [SECURITY.md](SECURITY.md).
